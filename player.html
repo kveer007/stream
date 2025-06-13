@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Video Player</title>
+</head>
+<body style="margin:0; background:#000">
+  <video
+    id="player"
+    controls
+    width="100%"
+    style="display:block; background:#000"
+  ></video>
+
+  <script>
+    const video = document.getElementById('player');
+    // ← change this filename+ext as needed
+    const videoTitle = 'Inception.mkv';
+    // ← change to the Drive ID of this file
+    const fileId = '1pxyupX9vV0O8YuDcfGPSxkTnORdFlmx8';
+    const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    // detect extension for MIME
+    const ext = videoTitle.split('.').pop().toLowerCase();
+    const mimeMap = { mp4: 'video/mp4', mkv: 'video/x-matroska' };
+    const mimeType = mimeMap[ext] || 'video/mp4';
+
+    // inject source
+    const src = document.createElement('source');
+    src.src  = driveUrl;
+    src.type = mimeType;
+    video.appendChild(src);
+
+    // your published CSV URL
+    const sheetUrl =
+      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQH7qVGR5iFWpkKIAQNWrmzIeNdLqGkpf5f94Rkm85fCYLVdWJCzm6Q78CkZ2UT1kx-hVl-8a4QDnR2/pub?output=csv';
+
+    // load resume point
+    fetch(sheetUrl)
+      .then(r => r.text())
+      .then(csv => {
+        const rows = csv
+          .trim()
+          .split(/\r?\n/)
+          .slice(1)                    // drop header
+          .map(line => line.split(',').map(c=>c.trim()));
+
+        // case-insensitive match
+        let match = rows.find(r=>r[0].toLowerCase()===videoTitle.toLowerCase());
+        if (!match && rows.length) match = rows[0];  // fallback to first row
+        const secs = match && !isNaN(parseFloat(match[1]))
+                   ? parseFloat(match[1])
+                   : 0;
+        video.currentTime = secs;
+      })
+      .catch(e=>console.error('CSV load error',e));
+
+    // helper to POST progress
+    function save(at) {
+      fetch('https://hook.eu2.make.com/of3gkqwtwwrjeo32v8vw5r4j3hxs18hf',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title: videoTitle,
+          time: Math.floor(at),
+          lastWatched: new Date().toISOString()
+        })
+      }).catch(e=>console.error('Save error',e));
+    }
+
+    video.addEventListener('pause', ()=> save(video.currentTime));
+    video.addEventListener('ended', ()=> save(video.duration));
+  </script>
+</body>
+</html>
